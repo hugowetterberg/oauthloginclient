@@ -1,0 +1,1 @@
+The OAuth login client allows Twitter-style OAuth login between Drupal sites. The [OAuth login provider](http://github.com/hugowetterberg/oauthloginprovider) is it's server counterpart.
