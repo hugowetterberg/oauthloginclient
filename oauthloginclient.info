@@ -1,0 +1,6 @@
+; $Id$
+name = OAuth Login Client
+description = Allows users to log in to your site through OAuth
+core = 6.x
+version = "6.x-1.0-beta1"
+package = "OAuth Login"

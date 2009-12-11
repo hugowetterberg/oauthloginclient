@@ -1,0 +1,96 @@
+<?php
+// $Id$
+
+/**
+ * Implementation of hook_install().
+ */
+function oauthloginclient_install() {
+  drupal_install_schema('oauthloginclient');
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function oauthloginclient_uninstall() {
+  drupal_uninstall_schema('oauthloginclient');
+}
+
+/**
+ * Implementation of hook_schema().
+ */
+function oauthloginclient_schema() {
+  $schema = array();
+
+  $schema['oauthloginclient_server']  = array(
+    'description' => t('Stores information about login servers'),
+    'fields' => array(
+      'sid' => array(
+        'description' => t('The primary identifier for a server.'),
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'name' => array(
+        'description' => t('The name of the server'),
+        'type' => 'varchar',
+        'length' => 100,
+        'not null' => TRUE,
+      ),
+      'title' => array(
+        'description' => t('The name to display for the server'),
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'url' => array(
+        'description' => t('A url to the server'),
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'endpoint' => array(
+        'description' => t('The api endpoint for the server'),
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'oauth_consumer_key' => array(
+        'description' => t('The OAuth consumer to use when logging in users'),
+        'type'        => 'varchar',
+        'length'      => 32,
+        'not null'    => TRUE,
+      ),
+    ),
+    'primary key' => array('sid'),
+    'unique keys' => array(
+      'name' => array('name'),
+    ),
+  );
+
+  $schema['oauthloginclient_user']  = array(
+    'description' => t('Stores information about connected users'),
+    'fields' => array(
+      'euid' => array(
+        'description' => t('The primary identifier for the external user.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'name' => array(
+        'description' => t('The name of the server'),
+        'type' => 'varchar',
+        'length' => 100,
+        'not null' => TRUE,
+      ),
+      'uid' => array(
+        'description' => t('The primary identifier for the local user.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('euid', 'name'),
+  );
+
+  return $schema;
+}

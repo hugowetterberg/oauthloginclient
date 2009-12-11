@@ -1,0 +1,194 @@
+<?php
+// $Id$
+
+/**
+ * Implementation of hook_perm().
+ */
+function oauthloginclient_perm() {
+  return array('administer oauthlogin client');
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function oauthloginclient_menu() {
+  $menu = array();
+
+  $menu['oauthlogin/login/%'] = array(
+    'title' => 'Login',
+    'file' => 'oauthloginclient.inc',
+    'page callback' => '_oauthloginclient_login',
+    'page arguments' => array(2),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+
+  $menu['admin/settings/oauthloginclient'] = array(
+    'title'   => 'OAuth login client settings',
+    'description' => 'Administer the settings for the oauthlogin client',
+    'file'  => 'oauthloginclient.admin.inc',
+    'page callback' => '_oauthloginclient_admin_index',
+    'access arguments' => array('adminster oauthlogin client'),
+    'type'    => MENU_NORMAL_ITEM,
+  );
+
+  $menu['admin/settings/oauthloginclient/index'] = array(
+    'title' => 'OAuth login servers',
+    'type'    => MENU_DEFAULT_LOCAL_TASK,
+    'weight'  => -10,
+  );
+
+  $menu['admin/settings/oauthloginclient/add_server'] = array(
+    'title' => 'Add server',
+    'file'  => 'oauthloginclient.admin.inc',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('_oauthloginclient_admin_add_server'),
+    'access arguments' => array('adminster oauthlogin client'),
+    'type'    => MENU_LOCAL_TASK,
+  );
+
+  $menu['admin/settings/oauthloginclient/server/%'] = array(
+    'title callback' => '_oauthloginclient_server_title_callback',
+    'title arguments' => array(4, 'Edit server !title'),
+    'file' => 'oauthloginclient.admin.inc',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('_oauthloginclient_admin_edit_server', 4),
+    'access arguments' => array('administer oauthlogin client'),
+    'type' => MENU_CALLBACK,
+  );
+
+  return $menu;
+}
+
+/**
+ * Implementation of hook_theme().
+ */
+function oauthloginclient_theme($existing, $type, $theme, $path) {
+  $themes = array();
+
+  $themes['oauthloginclient_admin_index'] = array(
+    'template' => 'oauthloginclient_admin_index',
+    'arguments' => array(
+      'servers' => array(),
+    ),
+  );
+
+  return $themes;
+}
+
+/**
+ * Menu system callback for loading login server titles.
+ */
+function _oauthloginclient_server_title_callback($sid, $title = NULL) {
+  $servers = oauthloginclient_get_servers();
+  if (isset($servers[$sid])) {
+    $title = empty($title) ? $servers[$sid]['title'] : t($title, array('!title' => $servers[$sid]['title']));
+  }
+  return $title;
+}
+
+/**
+ * Implementation of hook_form_user_login_alter().
+ */
+function oauthloginclient_form_user_login_alter(&$form, $form_state) {
+  $servers = oauthloginclient_get_servers();
+
+  if (!empty($servers)) {
+    $form['oauthlogin'] = array(
+      '#prefix' => '<ul class="oauthlogin-servers">',
+      '#suffix' => '</ul>',
+    );
+    foreach ($servers as $server) {
+      $form['oauthlogin'][$server['name']] = array(
+        '#value' => l(t('Log in using !title', array(
+          '!title' => $server['title'],
+        )), 'oauthlogin/login/' . $server['sid']),
+        '#prefix' => '<li class="oauthlogin-login-link">',
+        '#suffix' => '</li>',
+        '#weight' => -10,
+      );
+    }
+  }
+}
+
+/**
+ * Gets the registered oauthlogin servers on the system.
+ *
+ * @return array
+ *  An array withe server information keyed by server id.
+ */
+function oauthloginclient_get_servers() {
+  static $servers;
+
+  if (!$servers) {
+    $servers = array();
+    $res = db_query("SELECT * FROM {oauthloginclient_server}");
+    while ($server = db_fetch_array($res)) {
+      $servers[$server['sid']] = $server;
+    }
+  }
+
+  return $servers;
+}
+
+/**
+ * Adds a OAuth login server.
+ *
+ * @param array $server
+ *  An array with server information.
+ * @return int
+ *  The sid of the newly created server.
+ */
+function oauthloginclient_add_server($server) {
+  drupal_write_record('oauthloginclient_server', $server);
+  return $server['sid'];
+}
+
+/**
+ * Updates a OAuth login server.
+ *
+ * @param array $server
+ *  An array with server information.
+ * @return void
+ */
+function oauthloginclient_update_server($server) {
+  drupal_write_record('oauthloginclient_server', $server, array('sid'));
+}
+
+/**
+ * Implementation of hook_oauth_common_authorized().
+ */
+function oauthloginclient_oauth_common_authorized($consumer_token, $access_token, $request_token) {
+  if ($_SESSION['oauthlogin_request_key'] == $request_token->key) {
+    // Delete the access token, we only need it once.
+    $access_token->delete();
+
+    // Load the OAuth login server that's associated with the consumer
+    $res = db_query("SELECT * FROM {oauthloginclient_server}
+      WHERE oauth_consumer_key='%s'", array(
+        ':oauth_consumer_key' => $consumer_token->key,
+      ));
+    $login_server = db_fetch_array($res);
+    if ($login_server) {
+      module_load_include('inc', 'oauthloginclient');
+
+      // Get the external user info
+      $external_user = _oauthloginclient_fetch_external_user($login_server, $access_token, $consumer_token);
+
+      try {
+        // Login or register external user
+        _oauthloginclient_login_or_register_external_user($login_server, $external_user);
+
+        global $user;
+        drupal_set_message(t('You\'re now logged in as @name', array(
+          '@name' => $user->name,
+        )));
+      } catch (Exception $e) {
+        drupal_set_message(t('Error: !message', array(
+          '!message' => $e->getMessage(),
+        )), 'error');
+      }
+      drupal_goto();
+    }
+  }
+}
