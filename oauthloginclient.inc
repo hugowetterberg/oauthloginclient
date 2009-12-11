@@ -119,6 +119,7 @@ function _oauthloginclient_login_or_register_external_user($server, $external_us
     ));
     while ($taken = db_fetch_array($tres)) {
       if ($taken['name'] == $external_user['name']) {
+        // Handle name collisions by appending @[server name] to the user name
         $external_user['name'] .= '@' . $server['name'];
       }
       else if ($taken['email'] == $external_user['email']) {
