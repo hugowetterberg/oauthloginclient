@@ -68,7 +68,15 @@ function _oauthloginclient_fetch_external_user($login_server, $access_token, $co
   $client = new RestClient($auth, new RestClientBaseFormatter(RestClientBaseFormatter::FORMAT_PHP));
 
   // Fetch the external user
-  return (array)$client->post($login_server['endpoint'], array());
+  $info = FALSE;
+  try {
+    $info = (array)$client->post($login_server['endpoint'], array());
+  } catch (Exception $e) {
+    drupal_set_message(t('Failed to fetch user info for login: @message', array(
+      '@message' => $e->getMessage(),
+    )), 'error');
+  }
+  return $info;
 }
 
 
