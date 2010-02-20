@@ -85,15 +85,17 @@ function _oauthloginclient_admin_add_server_submit($form, $form_state) {
   oauthloginclient_add_server($values);
 
   // Save the consumer token so that we can get the secret later
-  $c_token = DrupalOAuthConsumerToken::load($values['oauth_consumer_key']);
+  $c_token = DrupalOAuthConsumer::load($values['oauth_consumer_key'], FALSE);
   if ($c_token) {
     $c_token->secret = $values['consumer_secret'];
     $c_token->provider_url = trim($values['url'], '/');
     $c_token->write(TRUE);
   }
   else {
-    $c_token = new DrupalOAuthConsumerToken($values['oauth_consumer_key'], $values['oauth_consumer_secret'], array(
-      'provider_url' => trim($values['url'], '/'),
+    $c_token = new DrupalOAuthConsumer($values['oauth_consumer_key'], $values['oauth_consumer_secret'], 'oob', FALSE, array(
+      'configuration' => array(
+        'provider_url' => trim($values['url'], '/'),
+      )
     ));
     $c_token->write();
   }
@@ -180,7 +182,7 @@ function _oauthloginclient_admin_edit_server($form_state, $sid) {
     '#size' => 32,
     '#maxlength' => 32,
     '#required' => TRUE,
-    '#default_value' => DrupalOAuthConsumerToken::load($server['oauth_consumer_key'])->secret,
+    '#default_value' => DrupalOAuthConsumer::load($server['oauth_consumer_key'], FALSE)->secret,
   );
 
   $form['update'] = array(
@@ -200,23 +202,19 @@ function _oauthloginclient_admin_edit_server_submit($form, &$form_state) {
 
   // Get original
   $server = $servers[$values['sid']];
-  $consumer = DrupalOAuthConsumerToken::load($server['oauth_consumer_key']);
+  $consumer = DrupalOAuthConsumer::load($server['oauth_consumer_key'], FALSE);
 
-  // Key has changed, create new, delete old
-  if ($consumer->key !== $values['oauth_consumer_key']) {
+  if ($consumer) {
     $consumer->delete();
-    // Create new consumer token
-    $consumer = new DrupalOAuthConsumerToken($values['oauth_consumer_key'], $values['oauth_consumer_secret'], array(
+  }
+
+  // Create new consumer token
+  $consumer = new DrupalOAuthConsumer($values['oauth_consumer_key'], $values['oauth_consumer_secret'], 'oob', FALSE, array(
+    'configuration' => array(
       'provider_url' => trim($values['url'], '/'),
-    ));
-    $consumer->write();
-  }
-  // just update
-  else {
-    $consumer->secret = $values['oauth_consumer_secret'];
-    $consumer->provider_url = trim($values['url'], '/');
-    $consumer->write(TRUE);
-  }
+    ),
+  ));
+  $consumer->write();
 
   // Update server
   oauthloginclient_update_server($values);

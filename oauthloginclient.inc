@@ -33,7 +33,7 @@ define('OAUTHLOGIN_ERROR_EMAIL_REGISTERED', 2);
 function _oauthloginclient_login($sid) {
   $servers = oauthloginclient_get_servers();
   $server = $servers[$sid];
-  $consumer_token = DrupalOAuthConsumerToken::load($server['oauth_consumer_key']);
+  $consumer_token = DrupalOAuthConsumer::load($server['oauth_consumer_key'], FALSE);
 
   $client = new DrupalOAuthClient($consumer_token);
   $request_token = $client->getRequestToken();
@@ -52,7 +52,7 @@ function _oauthloginclient_login($sid) {
  *  Login server information array.
  * @param DrupalOAuthToken $access_token
  *  The access token.
- * @param DrupalOAuthConsumerToken $consumer_token
+ * @param DrupalOAuthConsumer $consumer_token
  *  Optional. The consumer token.
  * @return array
  *  The external user information.
@@ -60,12 +60,12 @@ function _oauthloginclient_login($sid) {
 function _oauthloginclient_fetch_external_user($login_server, $access_token, $consumer_token=NULL) {
   // Load the consumer token if needed
   if (!$consumer_token) {
-    $consumer_token = DrupalOAuthConsumerToken::load($access_token->consumer_key);
+    $consumer_token = DrupalOAuthConsumer::load($access_token->consumer_key, FALSE);
   }
 
   // Set up the rest client
-  $auth = new RestClientOAuth($consumer_token, $access_token, new OAuthSignatureMethod_HMAC('sha1'));
-  $client = new RestClient($auth, new RestClientBaseFormatter(RestClientBaseFormatter::FORMAT_PHP));
+  $auth = new HttpClientOAuth($consumer_token, $access_token, new OAuthSignatureMethod_HMAC('sha1'));
+  $client = new HttpClient($auth, new HttpClientBaseFormatter(HttpClientBaseFormatter::FORMAT_PHP));
 
   // Fetch the external user
   $info = FALSE;
